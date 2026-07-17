@@ -1,0 +1,36 @@
+# Full self-hosted stack: TraderScope app + Postgres.
+# Usage: docker compose up -d  (then open http://localhost:3000)
+#
+# For production, point DATABASE_URL at your managed Postgres and
+# run only the `app` service, or deploy the image to any container host.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
+      INGEST_SECRET: change_me_to_a_long_random_secret
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

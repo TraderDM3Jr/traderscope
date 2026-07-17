@@ -93,9 +93,15 @@ seconds. No DLLs, no third-party services — straight into your Postgres.
 1. Push the repo to GitHub (see `OPERATIONS.md`).
 2. *New Project* → import repo → Framework *Next.js* (auto-detected).
 3. Add env vars `DATABASE_URL` and `INGEST_SECRET` in *Project → Settings → Environment*.
-4. Add a hosted Postgres (Neon / Supabase / Supabase) and paste its URL as `DATABASE_URL`.
-5. Deploy. On first load the app seeds itself.
-6. In MT4/MT5, whitelist the Vercel URL and point the EA at `/api/ingest`.
+4. Add a hosted Postgres (Neon / Supabase) and paste its URL as `DATABASE_URL`.
+5. **Create the production tables once** (the app auto-*seeds* data but does not
+   auto-create tables). From your local machine, point `drizzle-kit` at the prod DB:
+   ```bash
+   DATABASE_URL=postgresql://USER:PASS@HOST:5432/DB npx drizzle-kit push
+   ```
+   `drizzle-kit push` is idempotent — run it once per database, it won't drop data.
+6. Deploy. On first load the app seeds itself.
+7. In MT4/MT5, whitelist the Vercel URL and point the EA at `/api/ingest`.
 
 ### Option B — Self-hosted (Docker / VPS)
 

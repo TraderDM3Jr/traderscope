@@ -244,6 +244,12 @@ export default function Dashboard({
             >
               Connect EA
             </a>
+            <a
+              href="/api/logout"
+              className="rounded-md border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-red-500/40 hover:text-red-300"
+            >
+              Logout
+            </a>
             <button
               onClick={() => setLive((v) => !v)}
               className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${live ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-slate-700 text-slate-400"}`}

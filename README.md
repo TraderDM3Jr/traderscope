@@ -82,6 +82,8 @@ seconds. No DLLs, no third-party services — straight into your Postgres.
 |---|---|---|
 | `DATABASE_URL` | yes | PostgreSQL connection string |
 | `INGEST_SECRET` | yes | Bearer token the EA must present |
+| `APP_PASSWORD` | yes* | Dashboard login password (the gate) — *required once auth is enabled |
+| `APP_PEPPER` | no | Extra salt for the session cookie |
 | `NEXT_PUBLIC_APP_URL` | no | Base URL for docs/webhook hints |
 
 ---

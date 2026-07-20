@@ -13,7 +13,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const expected = process.env.APP_PASSWORD;
+  // Trim both sides so stray spaces (e.g. from the Vercel env field) can't lock you out
+  password = String(password).trim();
+  const expected = (process.env.APP_PASSWORD ?? "").trim();
   if (!expected || password !== expected) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }

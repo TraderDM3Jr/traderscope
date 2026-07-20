@@ -38,7 +38,7 @@ export async function middleware(req: NextRequest) {
     // Already logged in and hitting /login? Send to dashboard.
     if (pathname === "/login" && process.env.APP_PASSWORD) {
       const cookie = req.cookies.get("ts_session")?.value;
-      const expected = await sessionToken(process.env.APP_PASSWORD);
+      const expected = await sessionToken((process.env.APP_PASSWORD ?? "").trim());
       if (cookie === expected) {
         const url = req.nextUrl.clone();
         url.pathname = "/";
@@ -50,7 +50,7 @@ export async function middleware(req: NextRequest) {
 
   // Everything else requires a valid session
   const cookie = req.cookies.get("ts_session")?.value;
-  const expected = await sessionToken(process.env.APP_PASSWORD ?? "");
+  const expected = await sessionToken((process.env.APP_PASSWORD ?? "").trim());
   if (!process.env.APP_PASSWORD || cookie !== expected) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";

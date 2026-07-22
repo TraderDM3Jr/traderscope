@@ -129,6 +129,16 @@ export default function Dashboard({
   const [live, setLive] = useState(true);
   const [lastTick, setLastTick] = useState<Date>(new Date());
   const [pulseKey, setPulseKey] = useState(0);
+  const [testMsg, setTestMsg] = useState("");
+
+  async function sendTestAlert() {
+    try {
+      await fetch("/api/test-alert", { method: "POST" });
+      setTestMsg("Test sent — check Telegram/Discord");
+    } catch {
+      setTestMsg("Failed to send test");
+    }
+  }
   const busy = useRef(false);
 
   const refresh = useCallback(async (id: number) => {
@@ -683,10 +693,21 @@ export default function Dashboard({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-            <div className="border-b border-slate-800 px-5 py-3">
-              <h3 className="text-sm font-semibold text-slate-200">Alerts & Events</h3>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60">
+          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+            <h3 className="text-sm font-semibold text-slate-200">Alerts & Events</h3>
+            <button
+              onClick={sendTestAlert}
+              className="rounded-md border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20"
+            >
+              Send test alert
+            </button>
+          </div>
+          {testMsg && (
+            <div className="bg-slate-950 px-5 py-2 text-xs text-emerald-400">
+              {testMsg}
             </div>
+          )}
             <ul className="max-h-[380px] divide-y divide-slate-800/70 overflow-y-auto">
               {data.alerts.map((al) => (
                 <li key={al.id} className="px-5 py-3 text-sm">

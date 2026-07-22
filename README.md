@@ -84,6 +84,9 @@ seconds. No DLLs, no third-party services — straight into your Postgres.
 | `INGEST_SECRET` | yes | Bearer token the EA must present |
 | `APP_PASSWORD` | yes* | Dashboard login password (the gate) — *required once auth is enabled |
 | `APP_PEPPER` | no | Extra salt for the session cookie |
+| `TELEGRAM_BOT_TOKEN` | no | Telegram bot token for breach alerts |
+| `TELEGRAM_CHAT_ID` | no | Telegram chat/group id for alerts |
+| `DISCORD_WEBHOOK_URL` | no | Discord (or Slack) webhook for alerts |
 | `NEXT_PUBLIC_APP_URL` | no | Base URL for docs/webhook hints |
 
 ---

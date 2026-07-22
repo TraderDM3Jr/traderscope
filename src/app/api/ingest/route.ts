@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { and, eq, gte } from "drizzle-orm";
 import { computeMetrics } from "@/lib/metrics";
+import { sendAlert } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -326,6 +327,8 @@ export async function POST(req: Request) {
         ruleType: rule,
         message,
       });
+      // Fire off-board notification (Telegram/Discord) if configured
+      await sendAlert(message);
     }
   }
 

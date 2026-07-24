@@ -13,6 +13,7 @@ import {
   getTodayStats,
 } from "@/lib/queries";
 import { computeMetrics } from "@/lib/metrics";
+import { getProtectionState } from "@/lib/risk";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function HomePage() {
   const account = accs[0];
   const accountId = account.id;
 
-  const [positions, trades, snapshots, daily, today, bySymbol, byStrategy, alerts] =
+  const [positions, trades, snapshots, daily, today, bySymbol, byStrategy, alerts, protection] =
     await Promise.all([
       getPositions(accountId),
       getRecentTrades(accountId, 25),
@@ -40,6 +41,7 @@ export default async function HomePage() {
       getSymbolAggregates(accountId),
       getStrategyAggregates(accountId),
       getAlerts(accountId, 12),
+      getProtectionState(accountId),
     ]);
 
   const acct = (await getAccount(accountId))!;
@@ -86,6 +88,7 @@ export default async function HomePage() {
       ...a,
       createdAt: a.createdAt.toISOString(),
     })),
+    protection,
   };
 
   const accountLite = accs.map((a) => ({

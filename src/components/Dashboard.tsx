@@ -94,6 +94,28 @@ type Alert = {
   createdAt: string;
 };
 
+type ProtectionSettings = {
+  enabled: boolean;
+  dailyLossLimitUsd: number;
+  warningPct: number;
+  trimPct: number;
+  killPct: number;
+  ackTimeoutSeconds: number;
+};
+type RiskEvent = {
+  id: number;
+  level: string;
+  status: string;
+  firedAt: string;
+  ackDeadline: string | null;
+  actionTaken: string | null;
+  auto: boolean;
+};
+type ProtectionState = {
+  settings: ProtectionSettings | null;
+  events: RiskEvent[];
+};
+
 type DashboardData = {
   account: Account;
   metrics: ComputedMetrics;
@@ -105,6 +127,7 @@ type DashboardData = {
   bySymbol: SymAgg[];
   byStrategy: StratAgg[];
   alerts: Alert[];
+  protection: ProtectionState;
 };
 
 type AccountLite = Pick<Account, "id" | "login" | "propFirm" | "platform" | "phase" | "accountType">;
@@ -139,6 +162,47 @@ export default function Dashboard({
       setTestMsg("Failed to send test");
     }
   }
+
+  // Protection state (per-account auto risk guardrails)
+  const [prot, setProt] = useState<ProtectionState>(
+    initialData.protection ?? { settings: null, events: [] }
+  );
+  const [protBusy, setProtBusy] = useState(false);
+  const [protSaved, setProtSaved] = useState("");
+
+  async function saveProtection() {
+    setProtBusy(true);
+    setProtSaved("");
+    try {
+      const res = await fetch(`/api/accounts/${accountId}/protection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prot.settings),
+      });
+      if (res.ok) setProtSaved("Saved ✓");
+    } finally {
+      setProtBusy(false);
+    }
+  }
+
+  async function acknowledge() {
+    await fetch(`/api/accounts/${accountId}/protection`, {
+      method: "PATCH",
+    });
+    // refresh will pick up the new state on next tick
+  }
+
+  // keep protection state in sync with polled data
+  useEffect(() => {
+    if (data.protection) setProt(data.protection);
+  }, [data.protection]);
+
+  const openWarning = prot.events.find(
+    (e) => e.level === "warning" && (e.status === "open")
+  );
+  const secondsLeft = openWarning?.ackDeadline
+    ? Math.max(0, Math.round((new Date(openWarning.ackDeadline).getTime() - Date.now()) / 1000))
+    : 0;
   const busy = useRef(false);
 
   const refresh = useCallback(async (id: number) => {
@@ -330,6 +394,29 @@ export default function Dashboard({
           />
         </section>
 
+        {/* Auto-protection risk banner */}
+        {prot.settings?.enabled && openWarning && (
+          <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-amber-200">
+                  ⚠️ Auto-protection engaged — daily loss warning at {prot.settings.warningPct}%
+                </div>
+                <div className="mt-1 text-xs text-amber-200/80">
+                  Auto-trim in <b>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}</b> if not acknowledged.
+                  After that the system closes your worst losing trade, then all at {prot.settings.killPct}%.
+                </div>
+              </div>
+              <button
+                onClick={acknowledge}
+                className="rounded-md bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
+              >
+                I'm on it — Acknowledge
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Compliance + gauges + equity */}
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Compliance gauges */}
@@ -410,6 +497,148 @@ export default function Dashboard({
               maxLossLimitPct={Number(a.maxLossLimitPct)}
               todayStartBalance={todayStartBalance}
             />
+          </div>
+        </section>
+
+        {/* Auto-protection settings (per account) */}
+        <section className="mt-6">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-200">
+                  Auto-Protection Guardrails
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Per-account risk limits. The EA auto-trims your worst trade and kills all
+                  if you don&apos;t acknowledge a warning in time.
+                </p>
+              </div>
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  prot.settings?.enabled
+                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                    : "border-slate-700 text-slate-400"
+                }`}
+              >
+                {prot.settings?.enabled ? "ARMED" : "DISARMED"}
+              </span>
+            </div>
+
+            {!prot.settings && (
+              <p className="text-sm text-slate-500">Loading settings…</p>
+            )}
+            {prot.settings && (
+              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+                <ProtInput
+                  label="Enabled"
+                  type="checkbox"
+                  checked={prot.settings.enabled}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, enabled: v as boolean },
+                    }))
+                  }
+                />
+                <ProtInput
+                  label="Daily loss limit ($)"
+                  value={prot.settings.dailyLossLimitUsd}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, dailyLossLimitUsd: Number(v) || 0 },
+                    }))
+                  }
+                />
+                <ProtInput
+                  label="Ack timeout (sec)"
+                  value={prot.settings.ackTimeoutSeconds}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, ackTimeoutSeconds: Number(v) || 0 },
+                    }))
+                  }
+                />
+                <ProtInput
+                  label="Warning %"
+                  value={prot.settings.warningPct}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, warningPct: Number(v) || 0 },
+                    }))
+                  }
+                />
+                <ProtInput
+                  label="Trim worst @ %"
+                  value={prot.settings.trimPct}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, trimPct: Number(v) || 0 },
+                    }))
+                  }
+                />
+                <ProtInput
+                  label="Kill all @ %"
+                  value={prot.settings.killPct}
+                  onChange={(v) =>
+                    setProt((p) => ({
+                      ...p,
+                      settings: { ...p.settings!, killPct: Number(v) || 0 },
+                    }))
+                  }
+                />
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={saveProtection}
+                disabled={protBusy}
+                className="rounded-md bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-40"
+              >
+                {protBusy ? "Saving…" : "Save guardrails"}
+              </button>
+              {protSaved && <span className="text-xs text-emerald-400">{protSaved}</span>}
+            </div>
+
+            {prot.events.length > 0 && (
+              <div className="mt-5">
+                <div className="mb-2 text-xs uppercase tracking-wider text-slate-500">
+                  Recent risk events
+                </div>
+                <ul className="space-y-1.5 text-xs">
+                  {prot.events.slice(0, 6).map((e) => (
+                    <li
+                      key={e.id}
+                      className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-950/60 px-3 py-1.5"
+                    >
+                      <span>
+                        <span
+                          className={`mr-2 rounded px-1.5 py-0.5 ${
+                            e.level === "kill"
+                              ? "bg-red-500/20 text-red-300"
+                              : e.level === "trim"
+                                ? "bg-orange-500/20 text-orange-300"
+                                : "bg-amber-500/20 text-amber-300"
+                          }`}
+                        >
+                          {e.level}
+                        </span>
+                        {e.status}
+                        {e.auto ? " (auto)" : ""}
+                        {e.actionTaken ? ` → ${e.actionTaken}` : ""}
+                      </span>
+                      <span className="text-slate-500">
+                        {new Date(e.firedAt).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 
@@ -823,5 +1052,42 @@ function LegendDot({ color }: { color: string }) {
       className="inline-block h-2 w-2 rounded-full"
       style={{ background: color }}
     />
+  );
+}
+
+function ProtInput({
+  label,
+  value,
+  checked,
+  type,
+  onChange,
+}: {
+  label: string;
+  value?: number;
+  checked?: boolean;
+  type?: "checkbox";
+  onChange: (v: number | boolean) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
+      {type === "checkbox" ? (
+        <input
+          type="checkbox"
+          checked={!!checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-5 w-5 rounded accent-cyan-500"
+        />
+      ) : (
+        <input
+          type="number"
+          value={value ?? 0}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 outline-none focus:border-cyan-500"
+        />
+      )}
+    </label>
   );
 }

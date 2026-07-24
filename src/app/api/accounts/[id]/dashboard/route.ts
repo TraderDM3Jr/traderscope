@@ -10,6 +10,7 @@ import {
   getTodayStats,
 } from "@/lib/queries";
 import { computeMetrics } from "@/lib/metrics";
+import { getProtectionState } from "@/lib/risk";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function GET(
     bySymbol,
     byStrategy,
     alerts,
+    protection,
   ] = await Promise.all([
     getPositions(accountId),
     getRecentTrades(accountId, 25),
@@ -43,6 +45,7 @@ export async function GET(
     getSymbolAggregates(accountId),
     getStrategyAggregates(accountId),
     getAlerts(accountId, 12),
+    getProtectionState(accountId),
   ]);
 
   const initialBalance = Number(account.initialBalance);
@@ -81,5 +84,6 @@ export async function GET(
     bySymbol,
     byStrategy,
     alerts,
+    protection,
   });
 }

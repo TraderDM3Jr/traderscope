@@ -10,6 +10,7 @@ import {
 import { and, eq, gte } from "drizzle-orm";
 import { computeMetrics } from "@/lib/metrics";
 import { sendAlert } from "@/lib/notify";
+import { evaluateRisk } from "@/lib/risk";
 
 export const dynamic = "force-dynamic";
 
@@ -366,12 +367,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // 7) Auto-protection evaluation (per-account thresholds + auto-escalation)
+  const openForRisk = (payload.positions ?? []).map((p) => ({
+    ticket: String(p.ticket),
+    profit: String(p.profit),
+  }));
+  const risk = await evaluateRisk({
+    accountId,
+    equity: a.equity,
+    todayStartBalance: todayStart,
+    openPositions: openForRisk,
+  });
+
   return Response.json({
     ok: true,
     accountId,
     positions: (payload.positions ?? []).length,
     tradesInserted: insertedTrades,
     status: m.status,
+    action: risk.action,
+    ticket: risk.ticket,
   });
 }
 

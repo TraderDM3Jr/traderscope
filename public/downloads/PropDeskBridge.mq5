@@ -61,8 +61,72 @@ void PushData()
   string resultHeaders;
   int res = WebRequest("POST", IngestUrl, headers, timeout, data, result, resultHeaders);
   if (res == -1)
+  {
     Print("PropDeskBridge: WebRequest failed err=", GetLastError(),
           " — add ", IngestUrl, " to allowed URLs in Tools > Options > EAs.");
+    return;
+  }
+
+  // Read the server's instruction (action) and act on it.
+  string resp = CharArrayToString(result, 0, ArraySize(result), CP_UTF8);
+  string action = JsonString(resp, "action");   // NONE | WARNING | TRIM_WORST | KILL_ALL
+  string ticket = JsonString(resp, "ticket");   // worst-losing ticket for TRIM_WORST
+
+  if (action == "TRIM_WORST")
+  {
+    ullong t = StringToUlong(ticket);
+    if (t > 0) { if (PositionClose(t)) Print("PropDeskBridge: auto-trimmed ticket ", t); }
+  }
+  else if (action == "KILL_ALL")
+  {
+    int n = PositionsTotal();
+    for (int i = n - 1; i >= 0; i--)
+    {
+      ulong tk = PositionGetTicket(i);
+      if (tk > 0) PositionClose(tk);
+    }
+    Print("PropDeskBridge: auto-kill executed (", n, " positions)");
+  }
+}
+
+// Close one position by ticket (market order)
+bool PositionClose(ulong ticket)
+{
+  if (!PositionSelectByTicket(ticket)) return false;
+  string sym = PositionGetString(POSITION_SYMBOL);
+  double vol = PositionGetDouble(POSITION_VOLUME);
+  int dt = (int)PositionGetInteger(POSITION_TYPE); // 0=BUY, 1=SELL
+  double price = (dt == POSITION_TYPE_BUY)
+    ? SymbolInfoDouble(sym, SYMBOL_BID)
+    : SymbolInfoDouble(sym, SYMBOL_ASK);
+  int dev = (int)SymbolInfoInteger(sym, SYMBOL_TRADE_DIVISION);
+  MqlTradeRequest req = {};
+  MqlTradeResult ret = {};
+  req.action = TRADE_ACTION_DEAL;
+  req.position = ticket;
+  req.symbol = sym;
+  req.volume = vol;
+  req.type = (dt == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY; // opposite
+  req.price = NormalizeDouble(price, (int)SymbolInfoInteger(sym, SYMBOL_DIGITS));
+  req.deviation = dev;
+  req.type_filling = ORDER_FILLING_IOC;
+  return OrderSend(req, ret) && ret.retcode == TRADE_RETCODE_DONE;
+}
+
+// --- tiny JSON helpers (no external lib) ---
+string JsonString(string json, string key)
+{
+  string need = "\"" + key + "\":";
+  int p = StringFind(json, need);
+  if (p < 0) return "";
+  p += StringLen(need);
+  // skip whitespace
+  while (p < StringLen(json) && (json[p] == ' ' || json[p] == '\t')) p++;
+  if (json[p] != '"') return ""; // string value only (action/ticket are strings)
+  p++;
+  int end = StringFind(json, "\"", p);
+  if (end < 0) return "";
+  return StringSubstr(json, p, end - p);
 }
 
 string BuildBody()

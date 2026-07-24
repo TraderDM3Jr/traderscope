@@ -26,6 +26,33 @@ export const phases = pgTable("phases", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Per-account auto-protection settings (trader-defined risk guardrails)
+export const protectionSettings = pgTable("protection_settings", {
+  accountId: integer("account_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  dailyLossLimitUsd: numeric("daily_loss_limit_usd", { precision: 18, scale: 2 }).notNull().default("0"),
+  warningPct: numeric("warning_pct", { precision: 6, scale: 2 }).notNull().default("60"),
+  trimPct: numeric("trim_pct", { precision: 6, scale: 2 }).notNull().default("80"),
+  killPct: numeric("kill_pct", { precision: 6, scale: 2 }).notNull().default("95"),
+  ackTimeoutSeconds: integer("ack_timeout_seconds").notNull().default(300),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Escalation/risk events: warning fired -> acknowledged or auto-escalated
+export const riskEvents = pgTable("risk_events", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  level: text("level").notNull(), // warning | trim | kill
+  status: text("status").notNull().default("open"), // open | acknowledged | executed | expired
+  firedAt: timestamp("fired_at", { withTimezone: true }).notNull().defaultNow(),
+  ackDeadline: timestamp("ack_deadline", { withTimezone: true }),
+  ackedAt: timestamp("acked_at", { withTimezone: true }),
+  actionTaken: text("action_taken"), // NONE | TRIM_WORST | KILL_ALL
+  auto: boolean("auto").notNull().default(false), // true = executed by timeout (not trader)
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Trading journal entries, optionally linked to trades
 export const journalEntries = pgTable("journal_entries", {
   id: serial("id").primaryKey(),

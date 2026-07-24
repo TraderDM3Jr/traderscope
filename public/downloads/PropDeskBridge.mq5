@@ -89,9 +89,9 @@ void CheckProtection()
    }
    else if (StringFind(action, "TRIM_WORST") >= 0)
    {
-      string tok = StringSubstr(action, StringFind(action, " ") + 1);
-      ulong tk = StringToUlong(tok);
-      if (tk > 0)
+       string tok = StringSubstr(action, StringFind(action, " ") + 1);
+       ulong tk = (ulong)StringToInteger(tok);
+       if (tk > 0)
          if (trade.PositionClose(tk, (ulong)DeviationPoints))
             Print("PropDeskBridge: auto-trimmed ticket ", tk);
    }

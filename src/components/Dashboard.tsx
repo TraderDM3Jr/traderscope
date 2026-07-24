@@ -169,6 +169,9 @@ export default function Dashboard({
   );
   const [protBusy, setProtBusy] = useState(false);
   const [protSaved, setProtSaved] = useState("");
+  const [protLoaded, setProtLoaded] = useState(
+    !!initialData.protection
+  );
 
   async function saveProtection() {
     setProtBusy(true);
@@ -194,7 +197,10 @@ export default function Dashboard({
 
   // keep protection state in sync with polled data
   useEffect(() => {
-    if (data.protection) setProt(data.protection);
+    if (data.protection) {
+      setProt(data.protection);
+      setProtLoaded(true);
+    }
   }, [data.protection]);
 
   const openWarning = prot.events.find(
@@ -525,7 +531,9 @@ export default function Dashboard({
             </div>
 
             {!prot.settings && (
-              <p className="text-sm text-slate-500">Loading settings…</p>
+              <p className="text-sm text-slate-500">
+                {protLoaded ? "No settings yet — enable guardrails below." : "Loading settings…"}
+              </p>
             )}
             {prot.settings && (
               <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
@@ -536,7 +544,16 @@ export default function Dashboard({
                   onChange={(v) =>
                     setProt((p) => ({
                       ...p,
-                      settings: { ...p.settings!, enabled: v as boolean },
+                      settings: {
+                        ...(p.settings ?? {
+                          dailyLossLimitUsd: 5000,
+                          warningPct: 60,
+                          trimPct: 80,
+                          killPct: 95,
+                          ackTimeoutSeconds: 300,
+                        }),
+                        enabled: v as boolean,
+                      },
                     }))
                   }
                 />

@@ -190,9 +190,12 @@ export default function Dashboard({
       const res = await fetch(`/api/accounts/${accountId}/protection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ps),
+        body: JSON.stringify(prot.settings),
       });
-      if (res.ok) setProtSaved("Saved ✓");
+      if (res.ok) {
+        setProtSaved("Saved ✓");
+        setProt((p) => ({ ...p, settings: prot.settings }));
+      }
     } finally {
       setProtBusy(false);
     }

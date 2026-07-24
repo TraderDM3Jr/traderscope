@@ -165,7 +165,17 @@ export default function Dashboard({
 
   // Protection state (per-account auto risk guardrails)
   const [prot, setProt] = useState<ProtectionState>(
-    initialData.protection ?? { settings: null, events: [] }
+    initialData.protection ?? {
+      settings: {
+        enabled: false,
+        dailyLossLimitUsd: 0,
+        warningPct: 60,
+        trimPct: 80,
+        killPct: 95,
+        ackTimeoutSeconds: 300,
+      },
+      events: [],
+    }
   );
   const [protBusy, setProtBusy] = useState(false);
   const [protSaved, setProtSaved] = useState("");
@@ -180,7 +190,7 @@ export default function Dashboard({
       const res = await fetch(`/api/accounts/${accountId}/protection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(prot.settings),
+        body: JSON.stringify(ps),
       });
       if (res.ok) setProtSaved("Saved ✓");
     } finally {
@@ -246,6 +256,15 @@ export default function Dashboard({
 
   const a = data.account;
   const m = data.metrics;
+  const ps: ProtectionSettings =
+    prot.settings ?? {
+      enabled: false,
+      dailyLossLimitUsd: 0,
+      warningPct: 60,
+      trimPct: 80,
+      killPct: 95,
+      ackTimeoutSeconds: 300,
+    };
   const currency = a.currency;
   const initialBalance = Number(a.initialBalance);
   const todayStartBalance = data.today
@@ -401,16 +420,16 @@ export default function Dashboard({
         </section>
 
         {/* Auto-protection risk banner */}
-        {prot.settings?.enabled && openWarning && (
+        {ps.enabled && openWarning && (
           <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-amber-200">
-                  ⚠️ Auto-protection engaged — daily loss warning at {prot.settings.warningPct}%
+                  ⚠️ Auto-protection engaged — daily loss warning at {ps.warningPct}%
                 </div>
                 <div className="mt-1 text-xs text-amber-200/80">
                   Auto-trim in <b>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}</b> if not acknowledged.
-                  After that the system closes your worst losing trade, then all at {prot.settings.killPct}%.
+                  After that the system closes your worst losing trade, then all at {ps.killPct}%.
                 </div>
               </div>
               <button
@@ -509,26 +528,22 @@ export default function Dashboard({
         {/* Auto-protection settings (per account) */}
         <section className="mt-6">
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-200">
-                  Auto-Protection Guardrails
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Per-account risk limits. The EA auto-trims your worst trade and kills all
-                  if you don&apos;t acknowledge a warning in time.
-                </p>
-              </div>
+            <h3 className="text-sm font-semibold text-slate-200">
+              Auto-Protection Guardrails
+            </h3>
+              <p className="text-xs text-slate-500">
+                Per-account risk limits. The EA auto-trims your worst trade and kills all
+                if you don&apos;t acknowledge a warning in time.
+              </p>
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                  prot.settings?.enabled
+                  ps.enabled
                     ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
                     : "border-slate-700 text-slate-400"
                 }`}
               >
-                {prot.settings?.enabled ? "ARMED" : "DISARMED"}
+                {ps.enabled ? "ARMED" : "DISARMED"}
               </span>
-            </div>
 
             {!prot.settings && (
               <p className="text-sm text-slate-500">
@@ -569,7 +584,7 @@ export default function Dashboard({
                 />
                 <ProtInput
                   label="Ack timeout (sec)"
-                  value={prot.settings.ackTimeoutSeconds}
+                  value={ps.ackTimeoutSeconds}
                   onChange={(v) =>
                     setProt((p) => ({
                       ...p,
@@ -579,7 +594,7 @@ export default function Dashboard({
                 />
                 <ProtInput
                   label="Warning %"
-                  value={prot.settings.warningPct}
+                  value={ps.warningPct}
                   onChange={(v) =>
                     setProt((p) => ({
                       ...p,
@@ -589,7 +604,7 @@ export default function Dashboard({
                 />
                 <ProtInput
                   label="Trim worst @ %"
-                  value={prot.settings.trimPct}
+                  value={ps.trimPct}
                   onChange={(v) =>
                     setProt((p) => ({
                       ...p,
@@ -599,7 +614,7 @@ export default function Dashboard({
                 />
                 <ProtInput
                   label="Kill all @ %"
-                  value={prot.settings.killPct}
+                  value={ps.killPct}
                   onChange={(v) =>
                     setProt((p) => ({
                       ...p,

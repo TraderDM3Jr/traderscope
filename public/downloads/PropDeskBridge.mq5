@@ -11,8 +11,7 @@
 
 #include <Trade/Trade.mqh>
 
-input string IngestUrl       = "https://your-domain/api/ingest";             // POST target
-input string ProtectUrl      = "https://your-domain/api/protection-action";  // GET target (plain text)
+input string IngestUrl       = "https://your-domain/api/ingest";             // POST target (also returns guardrail action)
 input string IngestSecret    = "propdesk_bridge_9f2e7a1c4d";               // matches INGEST_SECRET
 input int    PushSeconds     = 3;     // push interval (seconds)
 input bool   IncludeHistory  = true;  // send recently closed deals
@@ -37,12 +36,11 @@ int OnInit()
 {
    EventSetTimer(PushSeconds);
    PushData();
-   CheckProtection();
    return INIT_SUCCEEDED;
 }
 void OnDeinit(const int reason) { EventKillTimer(); }
 void OnTick() {}
-void OnTimer() { PushData(); CheckProtection(); }
+void OnTimer() { PushData(); }
 
 //--- push the account snapshot to /api/ingest
 void PushData()
@@ -60,22 +58,16 @@ void PushData()
    ResetLastError();
    int res = WebRequest("POST", IngestUrl, headers, 5000, data, result, resultHeaders);
    if (res == -1)
+   {
       Print("PropDeskBridge: WebRequest failed err=", GetLastError(),
             " — whitelist ", IngestUrl, " in Tools > Options > Expert Advisors.");
-}
-
-//--- read the server's guardrail instruction (plain text) and act
-void CheckProtection()
-{
-   string login = StringFormat("%I64d", AccountInfoInteger(ACCOUNT_LOGIN));
-   string url = ProtectUrl + "?login=" + login;
-   char data[1] = {0};
-   char result[];
-   string resultHeaders = "";
-   ResetLastError();
-   int res = WebRequest("GET", url, "", 5000, data, result, resultHeaders);
-   if (res == -1) return; // network error; will retry next tick
-   string action = CharArrayToString(result, 0, ArraySize(result), CP_UTF8);
+      return;
+   }
+   // The server evaluates guardrails and returns { action, ticket } in the
+   // same response. Parse the plain JSON values and act on them.
+   string resp = CharArrayToString(result, 0, ArraySize(result), CP_UTF8);
+   string action = JsonString(resp, "action");   // NONE | WARNING | TRIM_WORST | KILL_ALL
+   string ticket = JsonString(resp, "ticket");    // worst-losing ticket for TRIM_WORST
 
    if (action == "KILL_ALL")
    {
@@ -87,14 +79,17 @@ void CheckProtection()
       }
       Print("PropDeskBridge: auto-kill executed");
    }
-   else if (StringFind(action, "TRIM_WORST") >= 0)
+   else if (action == "TRIM_WORST")
    {
-       string tok = StringSubstr(action, StringFind(action, " ") + 1);
-       ulong tk = (ulong)StringToInteger(tok);
+       ulong tk = (ulong)StringToInteger(ticket);
        if (tk > 0)
          if (trade.PositionClose(tk, (ulong)DeviationPoints))
             Print("PropDeskBridge: auto-trimmed ticket ", tk);
    }
+   // WARNING / NONE: no local action (alert already sent by server)
+}
+         if (trade.PositionClose(tk, (ulong)DeviationPoints))
+            Print("PropDeskBridge: auto-trimmed ticket ", tk);
 }
 
 //--- build the JSON body (positions + history)

@@ -208,13 +208,27 @@ export default function Dashboard({
     // refresh will pick up the new state on next tick
   }
 
-  // keep protection state in sync with polled data
+  // Initialize the guardrail panel ONCE from the server-rendered data.
+  // The 3s metric poll MUST NOT overwrite the user's in-progress edits or a
+  // just-saved value — that was wiping inputs every tick.
+  const protInitRef = useRef(false);
   useEffect(() => {
-    if (data.protection) {
-      setProt(data.protection);
-      setProtLoaded(true);
-    }
+    if (protInitRef.current) return; // already initialized; never clobber
+    if (!data.protection) return;
+    protInitRef.current = true;
+    setProt(data.protection);
+    setProtLoaded(true);
   }, [data.protection]);
+
+  // Fallback one-time init from SSR data (covers the null case)
+  useEffect(() => {
+    if (!protInitRef.current) {
+      protInitRef.current = true;
+      setProt(initialData.protection ?? { settings: null, events: [] });
+      setProtLoaded(!!initialData.protection);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openWarning = prot.events.find(
     (e) => e.level === "warning" && (e.status === "open")

@@ -104,10 +104,7 @@ void PushData()
          if (trade.PositionClose(tk, (ulong)DeviationPoints))
             Print("PropDeskBridge: auto-trimmed ticket ", tk);
    }
-   // WARNING / NONE: no local action (alert already sent by server)
-}
-         if (trade.PositionClose(tk, (ulong)DeviationPoints))
-            Print("PropDeskBridge: auto-trimmed ticket ", tk);
+    // WARNING / NONE: no local action (alert already sent by server)
 }
 
 //--- build the JSON body (positions + history)

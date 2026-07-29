@@ -31,6 +31,24 @@ string JsonEscape(const string s)
 
 string TypeToString(const int t) { return (t == POSITION_TYPE_BUY) ? "BUY" : "SELL"; }
 
+// Return the string value of "key" from a flat JSON object, e.g. {"action":"TRIM_WORST"}.
+// Uses StringGetCharacter (MQL5 does not allow json[i] subscripting in strict mode).
+string JsonString(string json, string key)
+{
+   string need = "\"" + key + "\":";
+   int p = StringFind(json, need);
+   if (p < 0) return "";
+   p += StringLen(need);
+   int len = StringLen(json);
+   // skip whitespace
+   while (p < len && (StringGetCharacter(json, p) == ' ' || StringGetCharacter(json, p) == '\t')) p++;
+   if (StringGetCharacter(json, p) != '"') return ""; // only handles string values
+   p++;
+   int end = StringFind(json, "\"", p);
+   if (end < 0) return "";
+   return StringSubstr(json, p, end - p);
+}
+
 //--- lifecycle
 int OnInit()
 {

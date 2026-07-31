@@ -175,7 +175,9 @@ string BuildBody()
             "\"openPrice\":%.*f,\"closePrice\":%.*f,\"profit\":%.2f,"
             "\"openedAt\":\"%s\",\"closedAt\":\"%s\",\"strategy\":\"%s\"}",
             dticket, sym,
-            TypeToString((int)HistoryDealGetInteger(dticket, DEAL_TYPE)),
+            // DEAL_ENTRY_OUT closes a position; its deal type is OPPOSITE the
+            // position's direction, so invert to record the real trade side.
+            (HistoryDealGetInteger(dticket, DEAL_TYPE) == DEAL_TYPE_BUY) ? "SELL" : "BUY",
             HistoryDealGetDouble(dticket, DEAL_VOLUME),
             digits, HistoryDealGetDouble(dticket, DEAL_PRICE),
             digits, HistoryDealGetDouble(dticket, DEAL_PRICE),
